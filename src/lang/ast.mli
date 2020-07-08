@@ -38,7 +38,7 @@ type cmpop = EQ | LEQ | GEQ | NEQ | GT | LT
 type expr =
   | Funcall of string * expr list
   | Unary   of unop * expr
-  | Binary  of expr * binop * expr
+  | Poly  of binop * expr list
   | Var     of vname
   | Cst     of i * var_concrete_ty
 
@@ -82,6 +82,9 @@ val falsef: formula
 
 (** Checks if an expression contains a variable. *)
 val has_variable: expr -> bool
+
+(** Count the number of variable in an expression*)
+val count_variable: expr -> int
 
 (** Checks if an expression is linear. *)
 val is_linear: expr -> bool
