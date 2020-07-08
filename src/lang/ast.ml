@@ -17,12 +17,10 @@ open Core.Types
 exception Wrong_modelling of string
 type vname = string
 type i = Bound_rat.t
-type unop = NEG
 type binop = ADD | SUB | MUL | DIV | POW
 type cmpop = EQ | LEQ | GEQ | NEQ | GT | LT
 type expr =
   | Funcall of string * expr list
-  | Unary   of unop * expr
   | Poly  of binop * expr list
   | Var     of vname
   | Cst     of i * var_concrete_ty
@@ -60,21 +58,18 @@ let falsef = Cmp (one, LEQ, zero)
 
 let rec has_variable = function
   | Funcall(_, args) -> List.exists has_variable args
-  | Unary (_, e) -> has_variable e
   | Poly (_, l) -> List.exists has_variable l
   | Var _ -> true
   | Cst _ -> false
 
 let rec count_variable = function
   | Funcall(_, args) -> List.fold_left (fun a b -> a+(count_variable b)) 0 args
-  | Unary (_, e) -> count_variable e
   | Poly (_, l) -> List.fold_left (fun a b -> a+(count_variable b)) 0 l
   | Var _ -> 1
   | Cst _ -> 0
 
 
 let rec is_linear = function
-  | Unary (NEG,e) -> is_linear e
   | Poly(MUL, l) | Poly(DIV, l)
     -> count_variable (Poly(MUL,l)) <= 1 && List.for_all is_linear l
   | Poly(POW, l) -> not (has_variable (Poly(POW, l)))

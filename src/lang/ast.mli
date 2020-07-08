@@ -26,9 +26,6 @@ type vname = string
 (** Constants are defined over rational because they can represent exactly integers or floating point numbers. *)
 type i = Bound_rat.t
 
-(** Unary arithmetic operators. *)
-type unop = NEG
-
 (** Binary arithmetic operators. *)
 type binop = ADD | SUB | MUL | DIV | POW
 
@@ -37,7 +34,6 @@ type cmpop = EQ | LEQ | GEQ | NEQ | GT | LT
 
 type expr =
   | Funcall of string * expr list
-  | Unary   of unop * expr
   | Poly  of binop * expr list
   | Var     of vname
   | Cst     of i * var_concrete_ty
