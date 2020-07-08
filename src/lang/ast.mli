@@ -34,7 +34,7 @@ type cmpop = EQ | LEQ | GEQ | NEQ | GT | LT
 
 type expr =
   | Funcall of string * expr list
-  | Poly  of binop * expr list
+  | Nary  of binop * expr list
   | Var     of vname
   | Cst     of i * var_concrete_ty
 

@@ -21,7 +21,7 @@ type binop = ADD | SUB | MUL | DIV | POW
 type cmpop = EQ | LEQ | GEQ | NEQ | GT | LT
 type expr =
   | Funcall of string * expr list
-  | Poly  of binop * expr list
+  | Nary  of binop * expr list
   | Var     of vname
   | Cst     of i * var_concrete_ty
 
@@ -58,22 +58,22 @@ let falsef = Cmp (one, LEQ, zero)
 
 let rec has_variable = function
   | Funcall(_, args) -> List.exists has_variable args
-  | Poly (_, l) -> List.exists has_variable l
+  | Nary (_, l) -> List.exists has_variable l
   | Var _ -> true
   | Cst _ -> false
 
 let rec count_variable = function
   | Funcall(_, args) -> List.fold_left (fun a b -> a+(count_variable b)) 0 args
-  | Poly (_, l) -> List.fold_left (fun a b -> a+(count_variable b)) 0 l
+  | Nary (_, l) -> List.fold_left (fun a b -> a+(count_variable b)) 0 l
   | Var _ -> 1
   | Cst _ -> 0
 
 
 let rec is_linear = function
-  | Poly(MUL, l) | Poly(DIV, l)
-    -> count_variable (Poly(MUL,l)) <= 1 && List.for_all is_linear l
-  | Poly(POW, l) -> not (has_variable (Poly(POW, l)))
-  | Poly(_, l) -> List.for_all is_linear l
+  | Nary(MUL, l) | Nary(DIV, l)
+    -> count_variable (Nary(MUL,l)) <= 1 && List.for_all is_linear l
+  | Nary(POW, l) -> not (has_variable (Nary(POW, l)))
+  | Nary(_, l) -> List.for_all is_linear l
   | Var _ | Cst _ -> true
   | _ -> false
 
