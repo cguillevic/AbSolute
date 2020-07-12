@@ -17,12 +17,10 @@ open Bounds
 let is_zero = Bound_rat.equal Bound_rat.zero
 let is_neg c = Bound_rat.sign c = -1
 
-let apply f l b op =
-  let rec aux l res test =
-    match l with
-    |[] -> (res, test)
-    |h::t -> let (h',bh) = f h b in aux t (h'::res) (test||bh)
-  in let (res,test) = aux l [] false in (Poly(op, res),test);;
+let apply f e1 e2 b op =
+  let (e1', b1) = f e1 b in
+  let (e2', b2) = f e2 b in
+  (Binary (e1', op, e2'), b1 || b2)
 
 let inv = function
   | EQ  -> EQ

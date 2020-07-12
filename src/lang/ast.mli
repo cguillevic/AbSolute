@@ -26,6 +26,9 @@ type vname = string
 (** Constants are defined over rational because they can represent exactly integers or floating point numbers. *)
 type i = Bound_rat.t
 
+(** Unary arithmetic operators. *)
+type unop = NEG
+
 (** Binary arithmetic operators. *)
 type binop = ADD | SUB | MUL | DIV | POW
 
@@ -34,7 +37,8 @@ type cmpop = EQ | LEQ | GEQ | NEQ | GT | LT
 
 type expr =
   | Funcall of string * expr list
-  | Nary  of binop * expr list
+  | Unary   of unop * expr
+  | Binary  of expr * binop * expr
   | Var     of vname
   | Cst     of i * var_concrete_ty
 
@@ -78,9 +82,6 @@ val falsef: formula
 
 (** Checks if an expression contains a variable. *)
 val has_variable: expr -> bool
-
-(** Count the number of variable in an expression*)
-val count_variable: expr -> int
 
 (** Checks if an expression is linear. *)
 val is_linear: expr -> bool
