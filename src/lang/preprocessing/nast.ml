@@ -14,12 +14,23 @@ type vname = string
 type i = int (*Bound_rat.t*)
 type unop = NEG
 type binop = ADD | SUB | MUL | DIV | POW
+type cmpop = EQ | LEQ | GEQ | NEQ | GT | LT
 type expr =
   | Funcall of string * expr list
   | Unary   of unop * expr
   | Binary  of expr * binop * expr
   | Var     of vname
   | Cst     of i * var_concrete_ty
+
+type bconstraint = (expr * cmpop * expr)
+type formula =
+  | FVar of vname
+  | Cmp of bconstraint
+  | Equiv of formula * formula
+  | Imply of formula * formula
+  | And of formula * formula
+  | Or  of formula * formula
+  | Not of formula
 
 (*************************************
 Types 
@@ -30,6 +41,17 @@ type nexpr =
   | Nary  of binop * nexpr list
   | NVar     of vname
   | NCst     of i * var_concrete_ty
+
+type nbconstraint = (nexpr * cmpop * nexpr)
+
+type nformula =
+  | NFVar of vname
+  | NCmp of nbconstraint
+  | NEquiv of formula list
+  | NImply of formula list
+  | NAnd of formula list
+  | NOr  of formula list
+  | NNot of formula
 
 (*************************************
 Auxiliaires 
@@ -115,7 +137,7 @@ let rec calculer_expr expr =
 
 
 (*************************************
-Conversion 
+Conversion : expr et nexpr
 *************************************)
 
 (*Convertit une nexpr en une expr*)
@@ -163,7 +185,7 @@ let nexpr_of_expr expr =
 ;;
 
 (*************************************
-Simplification 
+Simplification de nexpr
 *************************************)
 
 (*Supprime toutes les occurences de la constante de la liste*)
@@ -231,7 +253,7 @@ let rec simplify_nexpr nexpr =
 ;;
 
 (*************************************
-Tri 
+Tri de nexpr
 *************************************)
 
 (*Compare deux NCst 
@@ -346,9 +368,10 @@ let rec sort_nexpr nexpr =
 ;;
 
 (*************************************
-Test d'égalité 
+Test d'égalité de nexpr
 *************************************)
 
+(*Teste si a et b sont des nexpr équivalentes*)
 let is_equal_nexpr a b =
   let na = sort_nexpr (simplify_nexpr a) in
   let nb = sort_nexpr (simplify_nexpr b) in
@@ -357,7 +380,11 @@ let is_equal_nexpr a b =
 ;;
 
 (*************************************
-Jeux d'essai 
+Conversion : formula et nformula
+*************************************)
+
+(*************************************
+Jeux d'essai de nexpr
 *************************************)
 (*
 let ne1 = Nary(ADD, [nexpr_of_int 1 ; nexpr_of_int 2 ; nexpr_of_int 3]);;
