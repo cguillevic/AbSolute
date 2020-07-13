@@ -140,7 +140,8 @@ let expr_of_nexpr nexpr =
 let nexpr_of_expr expr = 
   let rec create_list op expr =
     match expr with
-    | Binary(a, binop, b) when binop = op -> (create_list op a) @ (create_list op b)
+    | Binary(a, binop, b) when binop = op && is_commutative op -> (create_list op a) @ (create_list op b)
+    | Binary(a, binop, b) when binop = op -> (create_list op a) @ [b]
     | _ -> [expr]
   in
   let rec convert expr =
@@ -230,6 +231,128 @@ let rec simplify_nexpr nexpr =
 ;;
 
 (*************************************
+Tri 
+*************************************)
+
+(*Compare deux NCst 
+ - si a > b -> 1
+ - si a = b -> 0
+ - si a < b -> -1
+*)
+let compare_ncst a b =
+  match a with 
+  |NCst (x, _) -> 
+                 (
+                   match b with
+                   |NCst (y, _) -> (
+                                     if x > y then 1
+                                     else if x = y then 0
+                                     else -1
+                                   )
+                   |_ -> failwith "b is not a constant" 
+                 )
+  |_ -> failwith "a is not a constant" 
+;;
+
+(*Compare deux NVar
+ - si a > b -> 1
+ - si a = b -> 0
+ - si a < b -> -1
+*)
+let compare_var a b =
+  match a with 
+  |NVar x -> 
+                 (
+                   match b with
+                   |NVar y -> (
+                                     if x > y then 1
+                                     else if x = y then 0
+                                     else -1
+                                   )
+                   |_ -> failwith "b is not a variable" 
+                 )
+  |_ -> failwith "a is not a variable" 
+;;
+
+(*Compare deux nexpr 
+ - si a > b -> 1
+ - si a = b -> 0
+ - si a < b -> -1
+*)
+let rec compare_nexpr a b =
+  let rec equals_list la lb =
+    match (la, lb) with
+    |([],[]) -> 0
+    |(ha::ta , hb::tb) -> (
+                             let compare_h = compare_nexpr ha hb in
+                             if compare_h <> 0 then compare_h
+                             else equals_list ta tb 
+                          )
+  in
+  match a with
+  |NCst _ as cst_a -> (
+                        match b with
+                        |NCst _ as cst_b -> compare_ncst cst_a cst_b
+                        |_ -> 1
+                      )
+  |NVar _ as var_a -> (
+                        match b with
+                        |NCst _ -> -1
+                        |NVar _ as var_b -> compare_var var_a var_b
+                        |_ -> 1
+                      )
+  |NFuncall (na, la) -> (
+                        match b with
+                        |NCst _ | NVar _ -> -1
+                        |NFuncall (nb, lb) ->  (
+                                                let compare_n = String.compare na nb in
+                                                let compare_length = compare (List.length la) (List.length lb) in
+                                                if compare_n <> 0 then compare_n 
+                                                else if compare_length <> 0 then compare_length
+                                                else equals_list la lb
+                                              ) 
+                        |_ -> 1
+                      )
+  |Nary (opa, la) -> (
+                        match b with
+                        |NCst _ | NVar _ | NFuncall _-> -1
+                        |Nary (opb, lb) ->  (
+                                                match (opa, opb) with
+                                                |(opa, opb) when opa = opb -> (
+                                                                                let compare_length = compare (List.length la) (List.length lb) in
+                                                                                if compare_length <> 0 then compare_length
+                                                                                else equals_list la lb
+                                                                               )
+                                                |(POW, _) -> 1
+                                                |(MUL, (DIV|ADD|SUB)) -> 1
+                                                |(DIV, (ADD|SUB)) -> 1
+                                                |(ADD, SUB) -> 1
+                                                | _ -> -1
+                                              ) 
+                      )
+;;
+
+(*Tri les expressions commutatives de nexpr*)
+let rec sort_nexpr nexpr =
+  match nexpr with
+  | NCst _ | NVar _ -> nexpr
+  | NFuncall (n, l) -> NFuncall (n, (List.map sort_nexpr l))
+  | Nary (op, l) when is_commutative op -> Nary (op , (List.sort compare_nexpr (List.map sort_nexpr l)))
+  | Nary (op, l) -> Nary (op, (List.map sort_nexpr l))  
+;;
+
+(*************************************
+Test d'égalité 
+*************************************)
+
+let is_equal_nexpr a b =
+  let na = sort_nexpr (simplify_nexpr a) in
+  let nb = sort_nexpr (simplify_nexpr b) in
+  if compare_nexpr na nb = 0 then true
+  else false
+;;
+
+(*************************************
 Jeux d'essai 
 *************************************)
 
@@ -247,6 +370,7 @@ let e3 = Binary(Binary(e1, DIV, (expr_of_int 9)), DIV, (expr_of_int 3));;
 let e4 = Binary(Binary((expr_of_int 8), DIV, (expr_of_int 4)), DIV, Binary((expr_of_int 9), DIV, (expr_of_int 3)));;
 let e5 = Binary(expr_of_int 1 , SUB , Binary(expr_of_int 4 , SUB , expr_of_int 2));;
 let e6 = Binary(Binary(expr_of_int 1 , SUB , expr_of_int 4) , SUB , expr_of_int 2);;
+let e7 = Binary(Binary(expr_of_int 1 , SUB , Binary(expr_of_int 4 , SUB , expr_of_int 2)), SUB, expr_of_int 1);;
 
 calculer_expr e3;;
 
@@ -277,5 +401,12 @@ let s15 = Nary (POW, [nexpr_of_int 5 ; nexpr_of_int 0 ; nexpr_of_int 4 ]);;
 let s16 = Nary (POW, [nexpr_of_int 1 ; nexpr_of_int 5 ; nexpr_of_int 3 ]);;
 let s17 = Nary (POW, [nexpr_of_int 0 ; nexpr_of_int 8 ; nexpr_of_int 4 ]);;
 let s18 = Nary (POW, [nexpr_of_int 2 ; nexpr_of_int 1 ; nexpr_of_int 3 ]);;
+
+(*Jeux d'essai de tests d'égalités*)
+
+Nary (op , [x])
+let te1 = Nary (ADD , [Nary (MUL , [nexpr_of_int 2 ; Nary (ADD , [NVar "x" ; Nary (MUL , [nexpr_of_int 2 ; nexpr_of_int 0])])]) ; Nary (DIV , [nexpr_of_int 8 ; nexpr_of_int 3])]);;
+
+let te2 = Nary (ADD , [Nary (MUL , [nexpr_of_int 2 ; NVar "x"]) ; Nary (DIV , [Nary (MUL , [nexpr_of_int 8 ; Nary (POW , [nexpr_of_int 10 ; nexpr_of_int 2 ; nexpr_of_int 0]) ]) ; Nary (SUB , [Nary (SUB , [nexpr_of_int 3])])])])
 
 
