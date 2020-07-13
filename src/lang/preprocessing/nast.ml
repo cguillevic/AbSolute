@@ -75,6 +75,14 @@ let is_constant a =
   | _ -> false
 ;;
 
+
+(*Teste si op est une opération commutative*)
+let is_commutative op =
+  match op with
+  | ADD | MUL -> true
+  | SUB | DIV | POW -> false
+;;
+
 (*Retourne l'expression neutre de l'opération*)
 let neutral_element op = 
  match op with
@@ -141,8 +149,12 @@ let nexpr_of_expr expr =
     | Var x -> NVar x
     | Cst (a, b) -> NCst (a, b)
     | Unary (NEG, e) -> Nary (SUB, [convert e])
-    | Binary (a, op, b) -> (
+    | Binary (a, op, b) when is_commutative op -> (
                              let nexpr_list = List.map convert ((create_list op a)@(create_list op b)) in
+                             Nary (op, nexpr_list)
+                           )
+    | Binary (a, op, b) -> (
+                             let nexpr_list = List.map convert ((create_list op a)@[b]) in
                              Nary (op, nexpr_list)
                            )
 
@@ -159,10 +171,23 @@ let delete_constant_in_nexpr_list constant nexpr_list =
   List.filter f nexpr_list;;
 
 (*
-Simplify a nexpr :
---a -> a
-a*b*0*c -> 0
-a*b*1*c -> a*b*c
+Simplify a nexpr expression
+Simplifications applied :
+- --a -> a
+- #a (with # equals to + or * or / or ^) -> a
+- 0-a-b-c -> - (a+b+c)
+- a+b+0+c -> a+b+c
+- a-b-0-c -> a-b-c
+- a+0+0 -> a
+- a-0-0 -> a
+- a*1*b -> a*b
+- a*0*b -> 0
+- a/1/b -> a/b
+- 0/a/b -> 0
+- a^0^b -> 1
+- 1^a^b -> 1
+- 0^a^b (with a <> 0 and b <> 0)-> 0
+- a^1^b -> a^b
 *)
 let rec simplify_nexpr nexpr =
   match nexpr with
@@ -172,36 +197,36 @@ let rec simplify_nexpr nexpr =
   | Nary (SUB, [(Nary (SUB, [e]))]) -> simplify_nexpr e
   | Nary (SUB, [e]) -> Nary (SUB, [simplify_nexpr e])
   | Nary (_, [e]) -> simplify_nexpr e
-  | Nary (ADD, l) -> (  let nl = delete_constant_in_nexpr_list (neutral_element ADD) (List.map simplify_nexpr l) in 
-                        if List.length nl = 0 then neutral_element ADD
-                        else if List.length nl = 1 then List.hd nl
-                        else Nary (ADD, nl)
-                     )
-  | Nary (SUB, l) -> (  let nl = delete_constant_in_nexpr_list (neutral_element SUB) (List.map simplify_nexpr l) in 
-                        if List.length nl = 0 then neutral_element SUB
-                        else if List.length nl = 1 then List.hd nl
-                        else Nary (SUB, nl)
-                     )
-  | Nary (MUL, l) -> (  let nl = List.map simplify_nexpr l in 
-                        if List.exists is_zero nl then nexpr_of_zero 
-                        else Nary(MUL, (delete_constant_in_nexpr_list (neutral_element MUL) nl))
-                     )
-  | Nary (DIV, l) -> (  let nl = List.map simplify_nexpr l in 
-                        if is_zero (List.hd nl) then nexpr_of_zero 
-                        else 
-                          begin 
-                            let nl' = delete_constant_in_nexpr_list (neutral_element DIV) (List.tl nl) in
-                            if List.length nl' = 0 then List.hd nl
-                            else Nary(DIV, (List.hd nl)::nl')
-                          end
-                     )
-  | Nary (POW, l) -> (  let nl = delete_constant_in_nexpr_list (neutral_element POW) (List.map simplify_nexpr (List.tl l)) in 
-                        if List.exists is_zero nl then nexpr_of_int 1 
-                        else if is_one (List.hd l) then nexpr_of_int 1 
-                        else if is_zero (List.hd l) then nexpr_of_zero
-                        else if List.length nl = 0 then List.hd l
-                        else Nary (POW, (List.hd l)::nl)
-                     )
+  | Nary (SUB, h::t) when is_zero h -> Nary (SUB, [simplify_nexpr (Nary (ADD, t))])
+  | Nary (op, l) -> (
+                      let simplified_list =
+                      match op with
+                      |ADD|SUB -> delete_constant_in_nexpr_list (neutral_element op) (List.map simplify_nexpr l)
+                      |MUL -> (
+                                 let nl = List.map simplify_nexpr l in 
+                                 if List.exists is_zero nl then [nexpr_of_zero] 
+                                 else delete_constant_in_nexpr_list (neutral_element op) nl
+                              )       
+                      |DIV -> (
+                                 let nl = List.map simplify_nexpr l in 
+                                 if is_zero (List.hd nl) then [nexpr_of_zero] 
+                               (*else if List.exists is_zero (List.tl nl) then not_a_number*)
+                                 else ((List.hd nl)::(delete_constant_in_nexpr_list (neutral_element op) (List.tl nl)))
+                              )
+                      |POW -> (
+                                 let nl = List.map simplify_nexpr l in 
+                                 let ntl = delete_constant_in_nexpr_list (neutral_element op) (List.tl nl) in
+                                 if is_one (List.hd nl) || List.exists is_zero ntl then [nexpr_of_int 1]
+                                 else if is_zero (List.hd nl) then [nexpr_of_zero]
+                                 else (List.hd nl)::ntl
+                              )
+
+                                
+                      in 
+                        if List.length simplified_list = 0 then neutral_element op
+                        else if List.length simplified_list = 1 then List.hd simplified_list
+                        else Nary (op, simplified_list)
+                    )
 ;;
 
 (*************************************
@@ -220,7 +245,8 @@ let e1 = Binary(Binary((expr_of_int 100), SUB, (expr_of_int 9)), SUB, (expr_of_i
 let e2 = Binary(Binary((expr_of_int 81), DIV, (expr_of_int 9)), DIV, (expr_of_int 3));;
 let e3 = Binary(Binary(e1, DIV, (expr_of_int 9)), DIV, (expr_of_int 3));;
 let e4 = Binary(Binary((expr_of_int 8), DIV, (expr_of_int 4)), DIV, Binary((expr_of_int 9), DIV, (expr_of_int 3)));;
-
+let e5 = Binary(expr_of_int 1 , SUB , Binary(expr_of_int 4 , SUB , expr_of_int 2));;
+let e6 = Binary(Binary(expr_of_int 1 , SUB , expr_of_int 4) , SUB , expr_of_int 2);;
 
 calculer_expr e3;;
 
@@ -229,4 +255,27 @@ let ne3 = nexpr_of_expr e3;;
 let l1 = [nexpr_of_int 1 ; nexpr_of_int 5 ; nexpr_of_int 0 ; nexpr_of_int 1 ; nexpr_of_int 8];;
 
 calculer_expr (expr_of_nexpr ne3);;
+
+(*Jeux d'essai de simplification*)
+
+let s1 = Nary (SUB, [Nary (SUB, [nexpr_of_int 1])]);;
+let s2 = Nary (SUB, [Nary (SUB, [Nary (SUB, [nexpr_of_int 1])])]);;
+let s3 = Nary (SUB, [Nary (SUB, [Nary (SUB, [Nary (SUB, [nexpr_of_int 1])])])]);;
+let s4 = Nary (ADD, [nexpr_of_int 5]);;
+let s5 = Nary (SUB, [nexpr_of_int 0 ; nexpr_of_int 4 ; nexpr_of_int 2]);;
+let s6 = Nary (ADD, [nexpr_of_int 5 ; nexpr_of_int 0 ; nexpr_of_int 4 ]);;
+let s7 = Nary (ADD, [nexpr_of_int 0 ; nexpr_of_int 0 ; nexpr_of_int 0 ]);;
+let s8 = Nary (SUB, [nexpr_of_int 5 ; nexpr_of_int 0 ; nexpr_of_int 4 ]);;
+let s9 = Nary (SUB, [nexpr_of_int 5 ; nexpr_of_int 0 ; nexpr_of_int 0 ]);;
+let s10 = Nary (SUB, [nexpr_of_int 0 ; nexpr_of_int 1]);;
+let s11 = Nary (MUL, [nexpr_of_int 5 ; nexpr_of_int 1 ; nexpr_of_int 4 ]);;
+let s12 = Nary (MUL, [nexpr_of_int 5 ; nexpr_of_int 0 ; nexpr_of_int 4 ]);;
+let s13 = Nary (DIV, [nexpr_of_int 5 ; nexpr_of_int 1 ; nexpr_of_int 4 ]);;
+let s14 = Nary (DIV, [nexpr_of_int 0 ; nexpr_of_int 8 ; nexpr_of_int 4 ]);;
+
+let s15 = Nary (POW, [nexpr_of_int 5 ; nexpr_of_int 0 ; nexpr_of_int 4 ]);;
+let s16 = Nary (POW, [nexpr_of_int 1 ; nexpr_of_int 5 ; nexpr_of_int 3 ]);;
+let s17 = Nary (POW, [nexpr_of_int 0 ; nexpr_of_int 8 ; nexpr_of_int 4 ]);;
+let s18 = Nary (POW, [nexpr_of_int 2 ; nexpr_of_int 1 ; nexpr_of_int 3 ]);;
+
 
