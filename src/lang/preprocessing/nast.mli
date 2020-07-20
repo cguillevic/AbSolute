@@ -32,7 +32,20 @@ val expr_of_nexpr : nexpr -> expr
 (** Convert a expr in a nexpr *)
 val nexpr_of_expr : expr -> nexpr
 
-(** Simplify a nexpr *)
+(** Simplify a nexpr
+Simplifications applied :
+--x = x
+0-x-y = -(x+y)
+x+y+0+z = x+y+z
+x-y-0-z = x-y-z
+x*y*1*z = x*y*z
+x*y*0*z = 0
+0/x/y (with x <> 0 && y <> 0) = 0
+x/y/1/z = x/y/z
+1^x^y = 1
+1^x^0^y = 1
+0^x^y (with x <> 0 and y <> 0) = 0
+ *)
 val simplify_nexpr : nexpr -> nexpr
 
 (** Compare 2 nexpr *)

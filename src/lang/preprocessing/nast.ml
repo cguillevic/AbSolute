@@ -150,8 +150,8 @@ and simplify_nary op l =
             else delete_constant_in_nexpr_list (neutral_element op) nl
       | FDIV ->
           let nl = List.map simplify_nexpr l in 
+          (*if List.exists is_zero (List.tl nl) then not_a_number else*)
             if is_zero (List.hd nl) then [nexpr_of_zero] 
-          (*else if List.exists is_zero (List.tl nl) then not_a_number*)
             else ((List.hd nl)::(delete_constant_in_nexpr_list (neutral_element op) (List.tl nl)))
       | FPOW ->
           let nl = List.map simplify_nexpr l in 
