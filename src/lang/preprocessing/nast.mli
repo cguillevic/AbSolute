@@ -13,12 +13,18 @@
 open Core.Types
 open Lang.Ast
 
+type fun_symbol = FADD | FSUB | FMUL | FDIV | FPOW | FNEG | COS | SIN
+
 type nexpr =  
-  | NFuncall of string * nexpr list
+  | NFuncall of fun_symbol * nexpr list
   | NVar     of vname
   | NCst     of i * var_concrete_ty
-  | NUnary   of unop * nexpr
-  | Nary     of binop * nexpr list
+
+(** Convert an integer in a nexpr*)
+val nexpr_of_int : int -> nexpr  
+
+(** Convert an integer in a expr*)
+val expr_of_int : int -> expr  
 
 (** Convert a nexpr in a expr *)
 val expr_of_nexpr : nexpr -> expr
@@ -28,6 +34,9 @@ val nexpr_of_expr : expr -> nexpr
 
 (** Simplify a nexpr *)
 val simplify_nexpr : nexpr -> nexpr
+
+(** Compare 2 nexpr *)
+val compare_nexpr : nexpr -> nexpr -> int
 
 (** Test if the 2 nexpr are equals *)
 val is_equal_nexpr : nexpr -> nexpr -> bool
